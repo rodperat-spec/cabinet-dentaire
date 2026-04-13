@@ -81,7 +81,14 @@ app.post('/api/check-availability', async (req, res) => {
 app.post('/api/book-appointment', async (req, res) => {
   console.log('📥 Données reçues:', JSON.stringify(req.body, null, 2));
 
-  const { nom, prenom, soin, date, heure, debut, fin } = req.body;
+  const { nom, prenom, soin, date, heure } = req.body;
+
+  // Gestion de l'accent : Retell envoie parfois "début" avec accent
+  const debut = req.body['\u00e9but'] || req.body['debut'] || req.body['d\u00e9but'];
+  const fin   = req.body['fin'];
+
+  console.log('📅 debut brut:', debut);
+  console.log('📅 fin brut:', fin);
 
   // Sécurité : convertit debut/fin en ISO 8601 valide selon le format reçu
   const buildISO = (val, dateStr) => {
@@ -99,8 +106,8 @@ app.post('/api/book-appointment', async (req, res) => {
   const debutISO = buildISO(debut, date);
   const finISO   = buildISO(fin, date);
 
-  console.log('📅 debut ISO:', debutISO);
-  console.log('📅 fin ISO:', finISO);
+  console.log('✅ debut ISO:', debutISO);
+  console.log('✅ fin ISO:', finISO);
 
   try {
     const calendar = google.calendar({ version: 'v3', auth: oauth2Client });
