@@ -80,8 +80,26 @@ app.post('/api/check-availability', async (req, res) => {
 
 // ===== OUTIL 2 : Créer un RDV dans Google Calendar =====
 app.post('/api/book-appointment', async (req, res) => {
-  const { nom, prenom, soin, date, heure, debut, fin } = req.body;
+// Ligne 83 - remplacez :
+console.log('📥 Données reçues:', JSON.stringify(req.body, null, 2));
 
+// Par ceci :
+const { nom, prenom, soin, date, heure, debut, fin } = req.body;
+
+// Ajoutez ces lignes juste après (avant le try) :
+const toISO = (val) => {
+ start: { dateTime: debutISO, timeZone: 'Europe/Paris' },
+end:   { dateTime: finISO,   timeZone: 'Europe/Paris' },
+  if (!isNaN(d.getTime())) return d.toISOString();
+  // Si format "HH:MM" reçu avec une date séparée
+  if (date && /^\d{2}:\d{2}$/.test(val)) {
+    return new Date(`${date}T${val}:00`).toISOString();
+  }
+  return val;
+};
+
+const debutISO = toISO(debut);
+const finISO   = toISO(fin);
   try {
     const calendar = google.calendar({ version: 'v3', auth: oauth2Client });
 
