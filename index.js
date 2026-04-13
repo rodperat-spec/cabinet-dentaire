@@ -1,4 +1,3 @@
-
 const express = require('express');
 const { google } = require('googleapis');
 const fs = require('fs');
@@ -80,34 +79,37 @@ app.post('/api/check-availability', async (req, res) => {
 
 // ===== OUTIL 2 : Créer un RDV dans Google Calendar =====
 app.post('/api/book-appointment', async (req, res) => {
-// Ligne 83 - remplacez :
-console.log('📥 Données reçues:', JSON.stringify(req.body, null, 2));
+  console.log('📥 Données reçues:', JSON.stringify(req.body, null, 2));
 
-// Par ceci :
-const { nom, prenom, soin, date, heure, debut, fin } = req.body;
+  const { nom, prenom, soin, date, heure, debut, fin } = req.body;
 
-// Ajoutez ces lignes juste après (avant le try) :
-const toISO = (val) => {
- start: { dateTime: debutISO, timeZone: 'Europe/Paris' },
-end:   { dateTime: finISO,   timeZone: 'Europe/Paris' },
-  if (!isNaN(d.getTime())) return d.toISOString();
-  // Si format "HH:MM" reçu avec une date séparée
-  if (date && /^\d{2}:\d{2}$/.test(val)) {
-    return new Date(`${date}T${val}:00`).toISOString();
-  }
-  return val;
-};
+  // Sécurité : convertit debut/fin en ISO 8601 valide selon le format reçu
+  const buildISO = (val, dateStr) => {
+    if (!val) return null;
+    // Si format "HH:MM" ou "HH:MM:SS", on combine avec la date
+    if (/^\d{2}:\d{2}(:\d{2})?$/.test(val)) {
+      return new Date(`${dateStr}T${val}`).toISOString();
+    }
+    // Sinon on tente une conversion directe
+    const d = new Date(val);
+    if (!isNaN(d.getTime())) return d.toISOString();
+    return val;
+  };
 
-const debutISO = toISO(debut);
-const finISO   = toISO(fin);
+  const debutISO = buildISO(debut, date);
+  const finISO   = buildISO(fin, date);
+
+  console.log('📅 debut ISO:', debutISO);
+  console.log('📅 fin ISO:', finISO);
+
   try {
     const calendar = google.calendar({ version: 'v3', auth: oauth2Client });
 
     const event = {
       summary: `${prenom} ${nom} — ${soin}`,
       description: `Patient : ${prenom} ${nom}\nSoin : ${soin}\nRDV pris via assistante vocale`,
-      start: { dateTime: debut, timeZone: 'Europe/Paris' },
-      end:   { dateTime: fin,   timeZone: 'Europe/Paris' },
+      start: { dateTime: debutISO, timeZone: 'Europe/Paris' },
+      end:   { dateTime: finISO,   timeZone: 'Europe/Paris' },
       reminders: {
         useDefault: false,
         overrides: [
@@ -134,7 +136,6 @@ const finISO   = toISO(fin);
 // ===== OUTIL 3 : Envoyer un SMS de confirmation =====
 app.post('/api/send-sms', async (req, res) => {
   const { telephone, nom, prenom, date, heure, soin } = req.body;
-  // Ici vous pouvez brancher Twilio, OVH SMS, etc.
   console.log(`📱 SMS envoyé à ${telephone} — RDV ${prenom} ${nom} le ${date} à ${heure} pour ${soin}`);
   res.json({ success: true, message: 'SMS envoyé' });
 });
