@@ -80,24 +80,36 @@ app.post('/api/check-availability', async (req, res) => {
 // ===== OUTIL 2 : Créer un RDV dans Google Calendar =====
 app.post('/api/book-appointment', async (req, res) => {
   console.log('📥 Données reçues:', JSON.stringify(req.body, null, 2));
+  console.log('📥 Clés reçues:', Object.keys(req.body));
 
-  const { nom, prenom, soin, date, heure } = req.body;
+  const body = req.body;
+  const nom    = body.nom;
+  const prenom = body.prenom;
+  const soin   = body.soin;
+  const date   = body.date;
+  const heure  = body.heure;
+  const fin    = body.fin;
 
-  // Gestion de l'accent : Retell envoie parfois "début" avec accent
-  const debut = req.body['\u00e9but'] || req.body['debut'] || req.body['d\u00e9but'];
-  const fin   = req.body['fin'];
+  // Chercher "debut" peu importe l'accent ou l'encodage
+  let debut = null;
+  for (const key of Object.keys(body)) {
+    const normalized = key.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+    if (normalized === 'debut') {
+      debut = body[key];
+      console.log(`🔑 Clé trouvée pour debut: "${key}" => ${debut}`);
+      break;
+    }
+  }
 
   console.log('📅 debut brut:', debut);
   console.log('📅 fin brut:', fin);
 
-  // Sécurité : convertit debut/fin en ISO 8601 valide selon le format reçu
+  // Sécurité : convertit debut/fin en ISO 8601 valide
   const buildISO = (val, dateStr) => {
     if (!val) return null;
-    // Si format "HH:MM" ou "HH:MM:SS", on combine avec la date
     if (/^\d{2}:\d{2}(:\d{2})?$/.test(val)) {
       return new Date(`${dateStr}T${val}`).toISOString();
     }
-    // Sinon on tente une conversion directe
     const d = new Date(val);
     if (!isNaN(d.getTime())) return d.toISOString();
     return val;
