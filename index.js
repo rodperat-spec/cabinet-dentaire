@@ -17,7 +17,6 @@ if (fs.existsSync('token.json')) {
   const token = JSON.parse(fs.readFileSync('token.json'));
   oauth2Client.setCredentials(token);
 
-  // Rafraîchit le token automatiquement si expiré
   oauth2Client.on('tokens', (tokens) => {
     if (tokens.refresh_token) {
       const current = JSON.parse(fs.readFileSync('token.json'));
@@ -31,7 +30,7 @@ app.get('/', (req, res) => {
   res.json({ message: 'Serveur cabinet dentaire opérationnel' });
 });
 
-// ===== AUTH Google (première connexion) =====
+// ===== AUTH Google =====
 app.get('/auth', (req, res) => {
   const url = oauth2Client.generateAuthUrl({
     access_type: 'offline',
@@ -45,7 +44,7 @@ app.get('/auth/callback', async (req, res) => {
   const { tokens } = await oauth2Client.getToken(code);
   oauth2Client.setCredentials(tokens);
   fs.writeFileSync('token.json', JSON.stringify(tokens));
-  res.send('✅ Connexion Google Calendar réussie ! Vous pouvez fermer cette page.');
+  res.send('✅ Connexion Google Calendar réussie !');
 });
 
 // ===== OUTIL 1 : Vérifier disponibilités =====
@@ -79,24 +78,26 @@ app.post('/api/check-availability', async (req, res) => {
 
 // ===== OUTIL 2 : Créer un RDV dans Google Calendar =====
 app.post('/api/book-appointment', async (req, res) => {
-  console.log('📥 Données reçues:', JSON.stringify(req.body, null, 2));
-  console.log('📥 Clés reçues:', Object.keys(req.body));
+  console.log('📥 Body complet reçu:', JSON.stringify(req.body, null, 2));
 
-  const body = req.body;
-  const nom    = body.nom;
-  const prenom = body.prenom;
-  const soin   = body.soin;
-  const date   = body.date;
-  const heure  = body.heure;
-  const fin    = body.fin;
+  // Retell envoie les paramètres dans req.body.args
+  const params = req.body.args || req.body;
+  console.log('📦 Paramètres utilisés:', JSON.stringify(params, null, 2));
 
-  // Chercher "debut" peu importe l'accent ou l'encodage
+  const nom    = params.nom;
+  const prenom = params.prenom;
+  const soin   = params.soin;
+  const date   = params.date;
+  const heure  = params.heure;
+  const fin    = params.fin;
+
+  // Chercher "debut" en ignorant les accents
   let debut = null;
-  for (const key of Object.keys(body)) {
+  for (const key of Object.keys(params)) {
     const normalized = key.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
     if (normalized === 'debut') {
-      debut = body[key];
-      console.log(`🔑 Clé trouvée pour debut: "${key}" => ${debut}`);
+      debut = params[key];
+      console.log(`🔑 Clé trouvée: "${key}" => ${debut}`);
       break;
     }
   }
@@ -104,7 +105,6 @@ app.post('/api/book-appointment', async (req, res) => {
   console.log('📅 debut brut:', debut);
   console.log('📅 fin brut:', fin);
 
-  // Sécurité : convertit debut/fin en ISO 8601 valide
   const buildISO = (val, dateStr) => {
     if (!val) return null;
     if (/^\d{2}:\d{2}(:\d{2})?$/.test(val)) {
@@ -152,9 +152,10 @@ app.post('/api/book-appointment', async (req, res) => {
   }
 });
 
-// ===== OUTIL 3 : Envoyer un SMS de confirmation =====
+// ===== OUTIL 3 : Envoyer un SMS =====
 app.post('/api/send-sms', async (req, res) => {
-  const { telephone, nom, prenom, date, heure, soin } = req.body;
+  const params = req.body.args || req.body;
+  const { telephone, nom, prenom, date, heure, soin } = params;
   console.log(`📱 SMS envoyé à ${telephone} — RDV ${prenom} ${nom} le ${date} à ${heure} pour ${soin}`);
   res.json({ success: true, message: 'SMS envoyé' });
 });
