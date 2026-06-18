@@ -152,7 +152,56 @@ app.post('/api/book-appointment', async (req, res) => {
   }
 });
 
-// ===== OUTIL 3 : Envoyer un SMS =====
+// ===== OUTIL 3 : Signaler une urgence =====
+app.post('/api/report-emergency', async (req, res) => {
+  console.log('📥 Body complet reçu (urgence):', JSON.stringify(req.body, null, 2));
+
+  const params = req.body.args || req.body;
+  console.log('📦 Paramètres urgence:', JSON.stringify(params, null, 2));
+
+  const nom       = params.nom;
+  const prenom    = params.prenom;
+  const telephone = params.telephone;
+  const email     = params.email;
+  const motif     = params.motif;
+
+  try {
+    const calendar = google.calendar({ version: 'v3', auth: oauth2Client });
+
+    // L'urgence est placée aujourd'hui, créneau de 15 min, pour apparaître immédiatement dans l'agenda du jour
+    const maintenant = new Date();
+    const debut = new Date(maintenant.getTime() + 5 * 60000); // dans 5 min
+    const fin = new Date(debut.getTime() + 15 * 60000);
+
+    const event = {
+      summary: `🚨 URGENCE — ${prenom} ${nom}`,
+      description: `URGENCE PATIENT\n\nNom : ${prenom} ${nom}\nTéléphone : ${telephone || 'non fourni'}\nEmail : ${email || 'non fourni'}\nMotif : ${motif || 'non précisé'}\n\nÀ rappeler dès que possible pour envoyer un message ou une ordonnance.`,
+      start: { dateTime: debut.toISOString(), timeZone: 'Europe/Paris' },
+      end:   { dateTime: fin.toISOString(),   timeZone: 'Europe/Paris' },
+      colorId: '11', // rouge dans Google Calendar
+      reminders: {
+        useDefault: false,
+        overrides: [
+          { method: 'popup', minutes: 0 },
+        ],
+      },
+    };
+
+    const result = await calendar.events.insert({
+      calendarId: 'primary',
+      resource: event,
+    });
+
+    console.log(`🚨 Urgence enregistrée : ${prenom} ${nom} — ${motif}`);
+    res.json({ success: true, message: 'Urgence enregistrée dans le calendrier', eventId: result.data.id });
+
+  } catch (err) {
+    console.error('❌ Erreur Google Calendar (urgence) :', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ===== OUTIL 4 : Envoyer un SMS =====
 app.post('/api/send-sms', async (req, res) => {
   const params = req.body.args || req.body;
   const { telephone, nom, prenom, date, heure, soin } = params;
